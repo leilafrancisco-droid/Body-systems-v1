@@ -1,0 +1,378 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digest-O-Quest: A Biology Adventure</title>
+    <style>
+        /* CSS Reset & Body */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* 16:9 Game Container */
+        #game-container {
+            position: relative;
+            width: 960px;
+            max-width: 100%;
+            aspect-ratio: 16 / 9;
+            background-color: #ffb6c1; /* Default Mouth Pink */
+            border: 4px solid #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            transition: background-color 1s ease-in-out;
+        }
+
+        /* HUD (Heads Up Display) */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 15px 20px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 10;
+        }
+
+        /* Character */
+        #character {
+            position: absolute;
+            bottom: 20%;
+            left: -100px; /* Start off screen */
+            font-size: 64px;
+            transition: left 2s ease-in-out;
+            z-index: 5;
+            filter: drop-shadow(0px 5px 5px rgba(0,0,0,0.5));
+        }
+
+        /* UI Overlays (Start, Questions, End) */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 20;
+            text-align: center;
+            padding: 40px;
+            box-sizing: border-box;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        h1 {
+            font-size: 48px;
+            margin-bottom: 10px;
+            color: #4CAF50;
+        }
+
+        h2 {
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        p {
+            font-size: 20px;
+            max-width: 80%;
+            line-height: 1.5;
+            margin-bottom: 30px;
+        }
+
+        /* Buttons */
+        .btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+            transition: transform 0.1s, background-color 0.2s;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            background-color: #45a049;
+            transform: scale(1.05);
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Question Options Grid */
+        #options-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 80%;
+            max-width: 600px;
+        }
+
+        .option-btn {
+            background-color: #2196F3;
+            padding: 20px;
+            font-size: 18px;
+        }
+
+        .option-btn:hover {
+            background-color: #1976D2;
+        }
+
+        /* Environment Decor (Simple CSS Shapes) */
+        .decor {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 20%;
+            background: rgba(0,0,0,0.2);
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        
+        <!-- HUD -->
+        <div id="hud" class="hidden">
+            <div>Score: <span id="score-display">0</span></div>
+            <div>Location: <span id="location-display">Mouth</span></div>
+        </div>
+
+        <!-- The Player Character -->
+        <div id="character" class="hidden">🍎</div>
+        <div class="decor"></div>
+
+        <!-- Start Screen -->
+        <div id="start-screen" class="overlay">
+            <h1>Digest-O-Quest!</h1>
+            <p>Welcome to the ultimate biological adventure! You are a tasty Apple on a journey through the human digestive tract. Answer class review questions correctly to navigate through the organs, absorb nutrients, and earn points.</p>
+            <button class="btn" onclick="startGame()">Start Journey</button>
+        </div>
+
+        <!-- Question Screen -->
+        <div id="question-screen" class="overlay hidden">
+            <h2 id="question-text">Question goes here?</h2>
+            <div id="options-container">
+                <!-- Buttons injected via JS -->
+            </div>
+        </div>
+
+        <!-- Feedback Screen -->
+        <div id="feedback-screen" class="overlay hidden">
+            <h1 id="feedback-title">Correct!</h1>
+            <p id="feedback-explanation">Explanation goes here.</p>
+            <button class="btn" onclick="nextLevel()">Continue Journey</button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="end-screen" class="overlay hidden">
+            <h1>Journey Complete!</h1>
+            <h2>Final Score: <span id="final-score">0</span> / 400</h2>
+            <p id="final-grade">Great job!</p>
+            <button class="btn" onclick="resetGame()">Play Again</button>
+        </div>
+
+    </div>
+
+    <script>
+        // Game State Variables
+        let currentLevelIndex = 0;
+        let score = 0;
+
+        // Level Data (Class Review Questions)
+        const levels = [
+            {
+                name: "The Mouth",
+                bgColor: "#ffb6c1", // Pinkish
+                characterPos: "30%",
+                question: "Welcome to the Mouth! Chewing is mechanical digestion, but what enzyme in saliva begins the chemical breakdown of carbohydrates?",
+                options: ["Pepsin", "Amylase", "Bile", "Lipase"],
+                correctAnswer: 1, // Index of correct option
+                explanation: "Excellent! Salivary amylase is the enzyme in your mouth that immediately starts breaking down complex carbohydrates (starches) into simpler sugars."
+            },
+            {
+                name: "The Stomach",
+                bgColor: "#cc3333", // Dark Red
+                characterPos: "50%",
+                question: "You've traveled down the esophagus into the Stomach. Which strong acid is produced here to kill bacteria and help unravel proteins?",
+                options: ["Sulfuric Acid", "Citric Acid", "Hydrochloric Acid", "Lactic Acid"],
+                correctAnswer: 2,
+                explanation: "Correct! The stomach secretes Hydrochloric Acid (HCl), creating a highly acidic environment (pH ~2) needed to activate enzymes like pepsin."
+            },
+            {
+                name: "Small Intestine",
+                bgColor: "#e6b800", // Yellow-orange
+                characterPos: "70%",
+                question: "You are now in the Small Intestine, the main site of nutrient absorption. What are the tiny, finger-like projections that increase the surface area here?",
+                options: ["Villi", "Cilia", "Flagella", "Alveoli"],
+                correctAnswer: 0,
+                explanation: "Spot on! Villi (and microvilli) act like a microscopic sponge, maximizing the surface area so nutrients can efficiently enter the bloodstream."
+            },
+            {
+                name: "Large Intestine",
+                bgColor: "#665233", // Brown-green
+                characterPos: "90%",
+                question: "Almost at the end! You are in the Large Intestine (Colon). What is the primary substance absorbed back into the body here?",
+                options: ["Fats", "Proteins", "Water", "Vitamins"],
+                correctAnswer: 2,
+                explanation: "Perfect! The large intestine's main job is to absorb Water from the remaining indigestible food matter, forming solid waste."
+            }
+        ];
+
+        // DOM Elements
+        const container = document.getElementById("game-container");
+        const startScreen = document.getElementById("start-screen");
+        const questionScreen = document.getElementById("question-screen");
+        const feedbackScreen = document.getElementById("feedback-screen");
+        const endScreen = document.getElementById("end-screen");
+        const hud = document.getElementById("hud");
+        const character = document.getElementById("character");
+        
+        const scoreDisplay = document.getElementById("score-display");
+        const locationDisplay = document.getElementById("location-display");
+        
+        const questionText = document.getElementById("question-text");
+        const optionsContainer = document.getElementById("options-container");
+        
+        const feedbackTitle = document.getElementById("feedback-title");
+        const feedbackExplanation = document.getElementById("feedback-explanation");
+
+        function startGame() {
+            score = 0;
+            currentLevelIndex = 0;
+            updateHUD();
+            
+            startScreen.classList.add("hidden");
+            hud.classList.remove("hidden");
+            character.classList.remove("hidden");
+            
+            loadLevel();
+        }
+
+        function loadLevel() {
+            const level = levels[currentLevelIndex];
+            
+            // Update environment visually
+            container.style.backgroundColor = level.bgColor;
+            locationDisplay.innerText = level.name;
+            
+            // Animate character moving
+            setTimeout(() => {
+                character.style.left = level.characterPos;
+            }, 100);
+
+            // Wait for animation, then show question
+            setTimeout(() => {
+                showQuestion(level);
+            }, 2000);
+        }
+
+        function showQuestion(level) {
+            questionText.innerText = level.question;
+            optionsContainer.innerHTML = ""; // Clear old options
+            
+            level.options.forEach((opt, index) => {
+                const btn = document.createElement("button");
+                btn.className = "btn option-btn";
+                btn.innerText = opt;
+                btn.onclick = () => checkAnswer(index, level.correctAnswer, level.explanation);
+                optionsContainer.appendChild(btn);
+            });
+
+            questionScreen.classList.remove("hidden");
+        }
+
+        function checkAnswer(selectedIndex, correctIndex, explanation) {
+            questionScreen.classList.add("hidden");
+            
+            if (selectedIndex === correctIndex) {
+                // Correct
+                score += 100;
+                feedbackTitle.innerText = "Correct! +100 Points";
+                feedbackTitle.style.color = "#4CAF50";
+                character.innerText = "🍎✨"; // Happy state
+            } else {
+                // Incorrect
+                score -= 25;
+                feedbackTitle.innerText = "Incorrect! -25 Points";
+                feedbackTitle.style.color = "#f44336";
+                character.innerText = "🍏💦"; // Sick/Sad state
+            }
+            
+            updateHUD();
+            feedbackExplanation.innerText = explanation;
+            feedbackScreen.classList.remove("hidden");
+        }
+
+        function nextLevel() {
+            feedbackScreen.classList.add("hidden");
+            character.innerText = "🍎"; // Reset character state
+            currentLevelIndex++;
+            
+            if (currentLevelIndex < levels.length) {
+                loadLevel();
+            } else {
+                // Move character off screen to the right
+                character.style.left = "120%"; 
+                setTimeout(showEndGame, 2000);
+            }
+        }
+
+        function showEndGame() {
+            hud.classList.add("hidden");
+            character.classList.add("hidden");
+            
+            document.getElementById("final-score").innerText = score;
+            const gradeText = document.getElementById("final-grade");
+            
+            if (score === 400) {
+                gradeText.innerText = "A+ Biologist! You mastered the digestive system!";
+            } else if (score >= 200) {
+                gradeText.innerText = "Great job! You digested most of that information well.";
+            } else {
+                gradeText.innerText = "Looks like you had a little indigestion. Time to review your notes!";
+            }
+            
+            endScreen.classList.remove("hidden");
+        }
+
+        function resetGame() {
+            endScreen.classList.add("hidden");
+            character.style.left = "-100px"; // Reset position
+            startGame();
+        }
+
+        function updateHUD() {
+            scoreDisplay.innerText = score;
+        }
+    </script>
+</body>
+</html>
+
+```
